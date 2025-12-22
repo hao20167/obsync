@@ -1,23 +1,27 @@
-import {App, Editor, MarkdownView, Modal, Notice, Plugin} from 'obsidian';
+import {App, Editor, MarkdownView, Modal, Notice, Plugin, FileSystemAdapter} from 'obsidian';
 import {DEFAULT_SETTINGS, ObsyncSettings, ObsyncSettingTab} from "./settings";
-
-// Remember to rename these classes and interfaces!
+import { SyncService } from 'sync/syncService';
+import { GitClient } from 'sync/gitClient';
 
 export default class Obsync extends Plugin {
 	settings: ObsyncSettings;
 
+	private syncService!: SyncService;
+
 	async onload() {
 		await this.loadSettings();
 
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('github', 'Obsync', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('Synced successfully!');
+		const vaultPath = this.getVaultPath();
+		const git = new GitClient(vaultPath);
+		this.syncService = new SyncService(git, this.currentTime);
+
+		this.addRibbonIcon('github', 'Obsync', async (evt: MouseEvent) => {
+			await this.onSyncClick();
 		});
 
 		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
 		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Last sync: 22:59 12-20-2025');
+		statusBarItemEl.setText('Last obsync: 22:59 12-20-2026');
 
 		// This adds a simple command that can be triggered anywhere
 		// this.addCommand({
@@ -80,6 +84,40 @@ export default class Obsync extends Plugin {
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
+
+	private async onSyncClick(): Promise<void> {
+		new Notice("Starting obsync1");
+		if (this.syncService.isSyncing()) 
+			new Notice("Obsync is already running...")
+		new Notice("Starting obsync");
+
+		try {
+			const resp = await this.syncService.doSync();
+			
+			if (resp.kind == "no-changes") 
+				new Notice("No changes to sync.")
+			else if (resp.kind == "remote-ahead")
+				new Notice("Remote has new commits. Pull/rebase manually first.")
+			else {
+				new Notice("Obsync success.")
+			}
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : String(e);
+			new Notice(`Obsync failed: ${msg}`);
+		}
+	}
+
+	private getVaultPath(): string {
+		const adapter = this.app.vault.adapter;
+		if (adapter instanceof FileSystemAdapter)
+			return adapter.getBasePath();
+		throw new Error("Adapter is not an instance of FileSystemAdapter");
+	}
+
+	private currentTime() {
+		const m = (window as any).moment;
+		return m ? m().format("HH:mm:ss YYYY-MM-DD") : new Date().toLocaleString();
+  	}
 }
 
 class ObsyncModal extends Modal {
