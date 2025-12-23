@@ -3,10 +3,12 @@ import Obsync from "./main";
 
 export interface ObsyncSettings {
 	mySetting: string;
+	lastSyncAt?: string;
 }
 
 export const DEFAULT_SETTINGS: ObsyncSettings = {
-	mySetting: 'default'
+	mySetting: 'default',
+	lastSyncAt: undefined,
 }
 
 export class ObsyncSettingTab extends PluginSettingTab {
@@ -32,5 +34,11 @@ export class ObsyncSettingTab extends PluginSettingTab {
 					this.plugin.settings.mySetting = value;
 					await this.plugin.saveSettings();
 				}));
+		// new Setting(containerEl)
+		// 	.setName('Settings #2')
+		// 	.setDesc('Last obsync')
+		// 	.addText(text => text
+		// 		.setValue(this.plugin.settings.lastSyncAt ?? "none")
+		// 	);
 	}
 }
