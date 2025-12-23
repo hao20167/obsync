@@ -17,7 +17,7 @@ export class SyncService {
         await this.git.fetchOrigin();
 
         const porcelain = await this.git.getStatusPorcelain();
-        if (porcelain.length > 0) return "local"; // new untracked files
+        if (porcelain.length > 0) return "local"; // new untracked files/changes
         
         const {ahead, behind} = await this.git.aheadBehind();
         
