@@ -1,4 +1,4 @@
-import {App, Editor, MarkdownView, Modal, Notice, Plugin, FileSystemAdapter, Setting} from 'obsidian';
+import {App, Modal, Notice, Plugin, FileSystemAdapter, Setting, moment} from 'obsidian';
 import {DEFAULT_SETTINGS, ObsyncSettings, ObsyncSettingTab} from "./settings";
 import { SyncService } from 'sync/syncService';
 import { GitClient } from 'sync/gitClient';
@@ -15,7 +15,7 @@ export default class Obsync extends Plugin {
 
 		const vaultPath = this.getVaultPath();
 		const git = new GitClient(vaultPath);
-		this.syncService = new SyncService(git, this.currentTime);
+		this.syncService = new SyncService(git, this.currentTime.bind(this));
 
 		this.statusBar = new StatusBar(this.addStatusBarItem());
 		if (this.settings.lastSyncAt) 
@@ -36,17 +36,18 @@ export default class Obsync extends Plugin {
 		// });
 
 		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
+		// this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
 	}
 
 	onunload() {
 	}
 
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<ObsyncSettings>);
+	async loadSettings(): Promise<void> {
+		const loaded = (await this.loadData()) as Partial<ObsyncSettings> | null;
+		this.settings = { ...DEFAULT_SETTINGS, ...(loaded ?? {}) };
 	}
 
-	async saveSettings() {
+	async saveSettings(): Promise<void> {
 		await this.saveData(this.settings);
 	}
 
@@ -83,7 +84,7 @@ export default class Obsync extends Plugin {
 			const now = this.currentTime();
 			this.statusBar.setLastSync(now);
 			this.settings.lastSyncAt = now;
-			this.saveSettings();
+			await this.saveSettings();
 		} else this.statusBar.setLastSync();
 	}
 
@@ -94,9 +95,8 @@ export default class Obsync extends Plugin {
 		throw new Error("Adapter is not an instance of FileSystemAdapter");
 	}
 
-	private currentTime() {
-		const m = (window as any).moment;
-		return m ? m().format("HH:mm:ss YYYY-MM-DD") : new Date().toLocaleString();
+	private currentTime(): string {
+		return moment().format("HH:mm:ss YYYY-MM-DD");
   	}
 
 	private async getConfirm(): Promise<boolean> {

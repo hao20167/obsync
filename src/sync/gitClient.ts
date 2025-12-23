@@ -1,22 +1,26 @@
 import type { ExecResult } from "./types"
 
+/* eslint-disable import/no-nodejs-modules */
+import { spawn } from "child_process";
+/* eslint-enable import/no-nodejs-modules */
+
 export class GitClient {
     constructor(private cwd: string) {}
 
     private execGit(args: string[]): Promise<ExecResult> {
         return new Promise((resolve, reject) => {
-            const { spawn } = require("child_process") as typeof import("child_process");
-
-            const resp = spawn("git", args, {cwd: this.cwd});
+            const child = spawn("git", args, {cwd: this.cwd});
             
             let stdout = "";
             let stderr = "";
 
-            resp.stdout.on("data", (d: Buffer) => (stdout += d.toString()));
-            resp.stderr.on("data", (d: Buffer) => (stderr += d.toString()));
-            resp.on("error", (e: Error) => reject(e));
-
-            resp.on("close", (code: number) => {
+            child.stdout.setEncoding("utf8");
+            child.stderr.setEncoding("utf8");
+            child.stdout.on("data", (d: string) => (stdout += d.toString()));
+            child.stderr.on("data", (d: string) => (stderr += d.toString()));
+            child.on("error", (e: Error) => reject(e));
+ 
+            child.on("close", (code: number) => {
                 resolve({
                     stdout: stdout.trim(),
                     stderr: stderr.trim(),

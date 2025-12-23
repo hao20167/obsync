@@ -1,4 +1,4 @@
-import { promises } from "dns";
+// import { promises } from "dns";
 import { GitClient } from "./gitClient";
 import { Mutex } from "./mutex"
 import type { SyncResult, DiffState } from "./types";
