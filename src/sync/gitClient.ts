@@ -61,6 +61,10 @@ export class GitClient {
         behind: Number.parseInt(behindStr, 10) || 0,
         };
     }
+    
+    async clearIndex(): Promise<void> {
+        await this.ok(["rm", "-r", "."]);
+    }
 
     async addAll(): Promise<void> {
         await this.ok(["add", "."]);

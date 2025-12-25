@@ -1,21 +1,24 @@
-import {App, Modal, Notice, Plugin, FileSystemAdapter, Setting, moment, TFile} from 'obsidian';
+import {App, Modal, Notice, Plugin, FileSystemAdapter, Setting, moment} from 'obsidian';
 import {DEFAULT_SETTINGS, ObsyncSettings, ObsyncSettingTab} from "./settings";
 import { SyncService } from 'sync/syncService';
 import { GitClient } from 'sync/gitClient';
 import { StatusBar } from 'ui/statusBar';
+import { ReadmeService } from 'sync/readmeService';
 
 export default class Obsync extends Plugin {
 	settings: ObsyncSettings;
 
 	private syncService!: SyncService;
 	private statusBar!: StatusBar;
+	private readmeService!: ReadmeService;
 
 	async onload() {
 		await this.loadSettings();
 
 		const vaultPath = this.getVaultPath();
 		const git = new GitClient(vaultPath);
-		this.syncService = new SyncService(git, this.currentTime.bind(this));
+		this.readmeService = new ReadmeService(this.app.vault, this.settings);
+		this.syncService = new SyncService(git, this.readmeService, this.currentTime.bind(this));
 
 		this.statusBar = new StatusBar(this.addStatusBarItem());
 		if (this.settings.lastSyncAt) 
@@ -64,8 +67,6 @@ export default class Obsync extends Plugin {
 		this.statusBar.setSyncing();
 		let okSync = false;
 
-		await this.generateREADME();
-
 		try {
 			const resp = await this.syncService.doSync();
 			
@@ -105,55 +106,6 @@ export default class Obsync extends Plugin {
 		return new Promise((resolve) => {
 			new ConfirmModal(this.app, resolve).open();
 		});
-	}
-
-	private async generateREADME(): Promise<void> {
-		const configFilePath = "target_paths.json";
-		const outputFile = "README.md";
-		const adapter = this.app.vault.adapter;
-
-		if (!(await adapter.exists(configFilePath))) {
-			new Notice(`Config file '${configFilePath}' not found.`);
-			return;
-		}
-
-		let targetPaths: string[] = [];
-		try {
-			const str = await adapter.read(configFilePath);
-			targetPaths = JSON.parse(str) as string[];
-			if (!Array.isArray(targetPaths)) {
-				new Notice(`'${configFilePath}' must contain a JSON array of file paths.`);
-				return;
-			}
-		} catch {
-			new Notice(`Failed to parse json from '${configFilePath}'.`);
-			return;
-		}
-
-		let content = `### Last obsync: ${this.settings.lastSyncAt}\n`;
-		
-		for (const path of targetPaths) {
-			const file = this.app.vault.getAbstractFileByPath(path);
-			if (file instanceof TFile) {
-				let now = await this.app.vault.read(file);
-				now = now
-						.replace(/\r\n/g, '\n')           		// Normalize Windows line endings
-						.replace(/\n{2,}/g, '\n\n')       		// Keep existing paragraph breaks as just two
-						.replace(/(?<!\n)\n(?!\n)/g, '\n\n'); 	// Convert single breaks to double
-				content += `\n\n---\n\n`;
-				content += `# File name: ${file.basename}\n\n`;
-				content += now;
-			} else {
-				new Notice(`File '${path}' not found.`);
-			}
-		}
-
-		try {
-			await adapter.write(outputFile, content);
-			new Notice(`Done generating '${outputFile}'`);
-		} catch {
-			new Notice(`Failed to write '${outputFile}'`);	
-		}
 	}
 }
 
