@@ -2,11 +2,12 @@
 import { GitClient } from "./gitClient";
 import { Mutex } from "./mutex"
 import type { SyncResult, DiffState } from "./types";
+import { ReadmeService } from "./readmeService";
 
 export class SyncService {
     private mutex = new Mutex();
 
-    constructor(private git: GitClient, private currentTime: () => string) {}
+    constructor(private git: GitClient, private readmeService: ReadmeService, private currentTime: () => string) {}
 
     isSyncing(): boolean {
         return this.mutex.isLocked();
@@ -37,6 +38,8 @@ export class SyncService {
                 return { kind: "remote-ahead" };
 
             if (diff == "local") {
+                await this.readmeService.generateREADME();
+                await this.git.clearIndex();
                 await this.git.addAll();
                 await this.git.commit(`Obsync ${this.currentTime()}`);
             }
