@@ -33,12 +33,25 @@ export class ReadmeService {
 			const file = this.myVault.getAbstractFileByPath(path);
 			if (file instanceof TFile) {
 				let now = await this.myVault.read(file);
+
+				// 1) normalize line endings
+				now = now.replace(/\r\n?/g, "\n");
+				// 2) protect markdown tables
+				const TABLE_BLOCK_RE = /(^\s*\|.*\|\s*\n^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*\n(?:^\s*\|.*\|\s*\n?)*)/gm;
+				const tables: string[] = [];
+					now = now.replace(TABLE_BLOCK_RE, (m) => {
+					tables.push(m);
+					return `__TABLE_${tables.length - 1}__`;
+				});
 				now = now
-						.replace(/\r\n/g, '\n')           		// Normalize Windows line endings
-						.replace(/\n{2,}/g, '\n\n')       		// Keep existing paragraph breaks as just two
-						.replace(/(?<!\n)\n(?!\n)/g, '\n\n'); 	// Convert single breaks to double
-				content += `\n\n---\n\n`;
-				content += `# File name: ${file.basename}\n\n`;
+						.replace(/\n{2,}/g, "\n\n")
+						.replace(/(?<!\n)\n(?!\n)/g, "\n\n");
+				// 3) restore tables (không đổi format table)
+				now = now.replace(/__TABLE_(\d+)__/g, (full, idxStr) => {
+					const idx = Number(idxStr);
+					return tables[idx] ?? full; // nếu thiếu thì giữ nguyên token
+				});
+				
 				content += now;
 			} else {
 				new Notice(`File '${path}' not found.`);
